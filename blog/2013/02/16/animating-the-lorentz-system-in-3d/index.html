@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+          <title>Pythonic Perambulations</title>
+        <meta charset="utf-8" />
+        <link href="/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="Pythonic Perambulations Full Atom Feed" />
+        <link href="/atom.xml" type="application/atom+xml" rel="alternate" title="Pythonic Perambulations Atom Feed" />
+        <link href="/feeds/misc.atom.xml" type="application/atom+xml" rel="alternate" title="Pythonic Perambulations Categories Atom Feed" />
+
+
+
+
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="/">Pythonic Perambulations <strong>Musings and ramblings through the world of Python and beyond</strong></a></h1>
+        </header><!-- /#banner -->
+        <nav id="menu"><ul>
+            <li><a href="/archives.html">Archives</a></li>
+            <li><a href="http://www.astro.washington.edu/users/vanderplas">Home Page</a></li>
+              <li class="active"><a href="/category/misc.html">misc</a></li>
+        </ul></nav><!-- /#menu -->
+<section id="content" class="body">
+  <header>
+    <h2 class="entry-title">
+      <a href="/blog/2013/02/16/animating-the-lorentz-system-in-3d/" rel="bookmark"
+         title="Permalink to Animating the Lorenz System in 3D">Animating the Lorenz System in 3D</a></h2>
+ 
+  </header>
+  <footer class="post-info">
+    <abbr class="published" title="2013-02-16T08:05:00-08:00">
+       2 16, 2013
+    </abbr>
+    <address class="vcard author">
+      By           <a class="url fn" href="/author/jake-vanderplas.html">Jake Vanderplas</a>
+    </address>
+  </footer><!-- /.post-info -->
+  <div class="entry-content">
+    <!-- PELICAN_BEGIN_SUMMARY -->
+
+<p>One of the things I really enjoy about Python is how easy it makes it to solve
+interesting problems and visualize those solutions in a compelling way. I've
+done several posts on creating animations using matplotlib's relatively new
+<a href="http://matplotlib.sourceforge.net/api/animation_api.html">animation toolkit</a>:
+(some examples are a chaotic
+<a href="/blog/2012/08/18/matplotlib-animation-tutorial/">double pendulum</a>,
+the collisions of
+<a href="/blog/2012/08/18/matplotlib-animation-tutorial/">particles in a box</a>,
+the time-evolution of a
+<a href="/blog/2012/09/05/quantum-python/">quantum-mechanical wavefunction</a>,
+and even a scene from the classic video game,
+<a href="/blog/2013/01/13/hacking-super-mario-bros-with-python/">Super Mario Bros.</a>).</p>
+<p>Recently, a reader <a href="/blog/2012/08/18/matplotlib-animation-tutorial/#comment-799781196">commented</a> asking whether I might do a 3D animation example.  Matplotlib
+has a decent 3D toolkit called
+<a href="http://matplotlib.org/mpl_toolkits/mplot3d/index.html">mplot3D</a>,
+and though I haven't previously seen it used in conjunction with the
+animation tools, there's nothing fundamental that prevents it.</p>
+<p>At the commenter's suggestion, I decided to try this out with a simple
+example of a chaotic system: the Lorenz equations.</p>
+<!-- PELICAN_END_SUMMARY -->
+
+<h2>Solving the Lorenz System</h2>
+<p>The <a href="http://en.wikipedia.org/wiki/Lorenz_system">Lorenz Equations</a> are a
+system of three coupled, first-order, nonlinear differential equations
+which describe the trajectory of a particle through time.
+The system was originally derived by Lorenz as a model
+of atmospheric convection, but the deceptive simplicity
+of the equations have made them an often-used example in fields beyond
+atmospheric physics.</p>
+<p>The equations describe the evolution of the spatial variables $x$, $y$,
+and $z$, given the governing parameters $\sigma$, $\beta$, and $\rho$,
+through the specification of the time-derivatives of the spatial variables:</p>
+<p>${\rm d}x/{\rm d}t = \sigma(y - x)$</p>
+<p>${\rm d}y/{\rm d}t = x(\rho - z) - y$</p>
+<p>${\rm d}z/{\rm d}t = xy - \beta z$</p>
+<p>The resulting dynamics are entirely deterministic giving a starting point
+$(x_0, y_0, z_0)$ and a time interval $t$.  Though it looks straightforward,
+for certain choices of the parameters $(\sigma, \rho, \beta)$, the
+trajectories become chaotic, and the resulting trajectories display some
+surprising properties.</p>
+<p>Though no general analytic solution exists for this system, the solutions
+can be computed numerically.
+Python makes this sort of problem very easy to solve: one can
+simply use Scipy's interface to
+<a href="https://computation.llnl.gov/casc/odepack/odepack_home.html">ODEPACK</a>,
+an optimized Fortran package for solving ordinary differential equations.
+Here's how the problem can be set up:</p>
+<div class="highlight"><pre><span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">scipy</span> <span class="kn">import</span> <span class="n">integrate</span>
+
+<span class="c"># Note: t0 is required for the odeint function, though it&#39;s not used here.</span>
+<span class="k">def</span> <span class="nf">lorentz_deriv</span><span class="p">((</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">),</span> <span class="n">t0</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">10.</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="mf">8.</span><span class="o">/</span><span class="mi">3</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">28.0</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Compute the time-derivative of a Lorenz system.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">sigma</span> <span class="o">*</span> <span class="p">(</span><span class="n">y</span> <span class="o">-</span> <span class="n">x</span><span class="p">),</span> <span class="n">x</span> <span class="o">*</span> <span class="p">(</span><span class="n">rho</span> <span class="o">-</span> <span class="n">z</span><span class="p">)</span> <span class="o">-</span> <span class="n">y</span><span class="p">,</span> <span class="n">x</span> <span class="o">*</span> <span class="n">y</span> <span class="o">-</span> <span class="n">beta</span> <span class="o">*</span> <span class="n">z</span><span class="p">]</span>
+
+<span class="n">x0</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>  <span class="c"># starting vector</span>
+<span class="n">t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)</span>  <span class="c"># one thousand time steps</span>
+<span class="n">x_t</span> <span class="o">=</span> <span class="n">integrate</span><span class="o">.</span><span class="n">odeint</span><span class="p">(</span><span class="n">lorentz_deriv</span><span class="p">,</span> <span class="n">x0</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span>
+</pre></div>
+
+
+<p>That's all there is to it!</p>
+<h2>Visualizing the results</h2>
+<p>Now that we've computed these results, we can use matplotlib's
+animation and 3D plotting toolkits
+to visualize the trajectories of several particles.  Because
+I've described the animation tools in-depth in a
+<a href="/blog/2012/08/18/matplotlib-animation-tutorial/">previous post</a>,
+I will skip that discussion here and jump straight into the code:</p>
+<p>{% include_code lorentz_animation.py lang:python Lorenz System %}</p>
+<p>The resulting animation looks something like this:</p>
+<p>{% video /downloads/videos/lorentz_attractor.mp4 360 270 /downloads/videos/lorentz_attractor_frame.png %}</p>
+<p>Notice that there are two locations in the space that seem to draw-in all
+paths: these are the so-called "Lorenz attractors", and have some interesting
+properties which you can read about elsewhere.  The qualitative
+characteristics of these Lorenz attractors
+vary in somewhat surprising ways as the parameters
+$(\sigma, \rho, \beta)$ are changed.  If you are so inclined, you may
+wish to download the above code and play with these values to see what
+the results look like.</p>
+<p>I hope that this brief exercise has shown you the power and flexibility of
+Python for understanding and visualizing a large array of problems, and
+perhaps given you the inspiration to explore similar problems.</p>
+<p>Happy coding!</p>
+  </div><!-- /.entry-content -->
+</section>
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>,
+                which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+        </footer><!-- /#contentinfo -->
+</body>
+</html>

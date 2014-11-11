@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+          <title>Pythonic Perambulations</title>
+        <meta charset="utf-8" />
+        <link href="/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="Pythonic Perambulations Full Atom Feed" />
+        <link href="/atom.xml" type="application/atom+xml" rel="alternate" title="Pythonic Perambulations Atom Feed" />
+        <link href="/feeds/misc.atom.xml" type="application/atom+xml" rel="alternate" title="Pythonic Perambulations Categories Atom Feed" />
+
+
+
+
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="/">Pythonic Perambulations <strong>Musings and ramblings through the world of Python and beyond</strong></a></h1>
+        </header><!-- /#banner -->
+        <nav id="menu"><ul>
+            <li><a href="/archives.html">Archives</a></li>
+            <li><a href="http://www.astro.washington.edu/users/vanderplas">Home Page</a></li>
+              <li class="active"><a href="/category/misc.html">misc</a></li>
+        </ul></nav><!-- /#menu -->
+<section id="content" class="body">
+  <header>
+    <h2 class="entry-title">
+      <a href="/blog/2012/08/16/memoryview-benchmarks-2/" rel="bookmark"
+         title="Permalink to Memoryview Benchmarks 2">Memoryview Benchmarks 2</a></h2>
+ 
+  </header>
+  <footer class="post-info">
+    <abbr class="published" title="2012-08-16T14:19:00-07:00">
+       8 16, 2012
+    </abbr>
+    <address class="vcard author">
+      By           <a class="url fn" href="/author/jake-vanderplas.html">Jake Vanderplas</a>
+    </address>
+  </footer><!-- /.post-info -->
+  <div class="entry-content">
+    <!-- PELICAN_BEGIN_SUMMARY -->
+
+<p>In the <a href="/blog/2012/08/08/memoryview-benchmarks/">previous post</a>, I explored
+how cython typed memoryviews can be used to speed up repeated array
+operations.  It became clear that typed memoryviews are superior to
+the ndarray syntax for slicing, and as fast as raw pointers for single
+element access.  In the comments, Mathieu brought up an interesting
+question: is the ndarray syntax as good as typed memoryviews if you're
+not doing slicing?</p>
+<p>The answer turns out to be yes, <em>unless</em> the compiler tries to inline your
+function.</p>
+<!-- PELICAN_END_SUMMARY -->
+
+<h3>Inlined Memoryview</h3>
+<p>We'll use a slightly simpler benchmark script here for simplicity.  We'll
+use inlined typed memoryviews for the inner function, and call this function
+within an outer loop:</p>
+<div class="highlight"><pre><span class="k">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="k">cimport</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="k">cimport</span> <span class="nn">cython</span>
+
+<span class="nd">@cython</span><span class="o">.</span><span class="n">boundscheck</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
+<span class="nd">@cython</span><span class="o">.</span><span class="n">wraparound</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
+<span class="k">cdef</span> <span class="kr">inline</span> <span class="kt">double</span> <span class="nf">inner_func</span><span class="p">(</span><span class="n">double</span><span class="p">[:,</span> <span class="p">::</span><span class="mf">1</span><span class="p">]</span> <span class="n">X</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">X</span><span class="p">[</span><span class="mf">0</span><span class="p">,</span> <span class="mf">0</span><span class="p">]</span>
+
+<span class="k">def</span> <span class="nf">loop_1</span><span class="p">(</span><span class="nb">int</span> <span class="n">N</span><span class="p">,</span> <span class="n">switch</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+    <span class="k">cdef</span> <span class="kt">double</span>[<span class="p">:,</span> <span class="p">::</span><span class="mf">1</span><span class="p">]</span> <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mf">100</span><span class="p">,</span> <span class="mf">100</span><span class="p">))</span>
+    <span class="k">cdef</span> <span class="kt">int</span> <span class="nf">i</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">):</span>
+        <span class="c"># this should be inlined by the compiler</span>
+        <span class="n">inner_func</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+</pre></div>
+
+
+<p>The inner function is called <code>N</code> times.  We've used the "inline" keyword here:
+it turns out this is optional with common compiler optimizations turned on.
+<code>gcc</code> and other compilers are smart enough to figure out that this function
+should be inlined, even if the cython code doesn't mark it as such.  Timing
+the function on one million loops gives us our comparison benchmark:</p>
+<div class="highlight"><pre><span class="c">%timeit loop_1(1E6)</span>
+<span class="mi">100000</span> <span class="n">loops</span><span class="p">,</span> <span class="n">best</span> <span class="n">of</span> <span class="mi">3</span><span class="p">:</span> <span class="mf">10.1</span> <span class="n">us</span> <span class="n">per</span> <span class="n">loop</span>
+</pre></div>
+
+
+<p>Just over a millisecond to perform this loop one million times.</p>
+<h3>Non-inlined Memoryview</h3>
+<p>Because the compilers are generally so smart, we actually need to be a bit
+clever to make sure our function is <em>not</em> inlined.  We'll do that through
+a switch statement in the loop call, which selects between two possible
+inner functions.  This may seem a bit contrived, but it could come up
+in practice: for example, if we wanted to create a KDTree for nearest neighbor
+searches which can use one of several distance metrics within a single tree
+framework, we might be tempted to try a solution like this:</p>
+<div class="highlight"><pre><span class="k">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="k">cimport</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="k">cimport</span> <span class="nn">cython</span>
+
+<span class="k">ctypedef</span> <span class="n">double</span> <span class="p">(</span><span class="o">*</span><span class="n">inner_func_ptr</span><span class="p">)(</span><span class="n">double</span><span class="p">[:,</span> <span class="p">::</span><span class="mf">1</span><span class="p">])</span>
+
+<span class="nd">@cython</span><span class="o">.</span><span class="n">boundscheck</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
+<span class="nd">@cython</span><span class="o">.</span><span class="n">wraparound</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
+<span class="k">cdef</span> <span class="kt">double</span> <span class="nf">inner_func_1</span><span class="p">(</span><span class="n">double</span><span class="p">[:,</span> <span class="p">::</span><span class="mf">1</span><span class="p">]</span> <span class="n">X</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">X</span><span class="p">[</span><span class="mf">0</span><span class="p">,</span> <span class="mf">0</span><span class="p">]</span>
+
+<span class="nd">@cython</span><span class="o">.</span><span class="n">boundscheck</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
+<span class="nd">@cython</span><span class="o">.</span><span class="n">wraparound</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
+<span class="k">cdef</span> <span class="kt">double</span> <span class="nf">inner_func_2</span><span class="p">(</span><span class="n">double</span><span class="p">[:,</span> <span class="p">::</span><span class="mf">1</span><span class="p">]</span> <span class="n">X</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">X</span><span class="p">[</span><span class="mf">0</span><span class="p">,</span> <span class="mf">0</span><span class="p">]</span>
+
+<span class="k">def</span> <span class="nf">loop_2</span><span class="p">(</span><span class="nb">int</span> <span class="n">N</span><span class="p">,</span> <span class="n">switch</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+    <span class="c"># use a switch to ensure that inlining can&#39;t happen: compilers</span>
+    <span class="c"># are usually smart enough to figure it out otherwise.</span>
+    <span class="k">cdef</span> <span class="kt">inner_func_ptr</span> <span class="nf">func</span>
+    <span class="k">if</span> <span class="n">switch</span><span class="p">:</span>
+        <span class="n">func</span> <span class="o">=</span> <span class="n">inner_func_1</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">func</span> <span class="o">=</span> <span class="n">inner_func_2</span>
+
+    <span class="k">cdef</span> <span class="kt">double</span>[<span class="p">:,</span> <span class="p">::</span><span class="mf">1</span><span class="p">]</span> <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mf">100</span><span class="p">,</span> <span class="mf">100</span><span class="p">))</span>
+    <span class="k">cdef</span> <span class="kt">int</span> <span class="nf">i</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">):</span>
+        <span class="n">func</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+</pre></div>
+
+
+<p>By adding the switch function, it means the compiler cannot know at compile
+time which of the inner functions will be used in the loop, and they
+cannot be inlined.  The timing results are as follows:</p>
+<div class="highlight"><pre><span class="c">%timeit loop_2(1E6)</span>
+<span class="mi">10</span> <span class="n">loops</span><span class="p">,</span> <span class="n">best</span> <span class="n">of</span> <span class="mi">3</span><span class="p">:</span> <span class="mf">22.9</span> <span class="n">ms</span> <span class="n">per</span> <span class="n">loop</span>
+</pre></div>
+
+
+<p>Using a non-inlined function makes things significantly slower in this case!
+So, if you're repeatedly calling a small function, inlining can be <em>very</em>
+important for optimal execution times.</p>
+<h3>The Problem with ndarray</h3>
+<p>It turns out that beyond slicing, the problem with the ndarray type is that
+multi-dimensional arrays require relatively expensive buffer checks whenever
+a function is called.  This causes similar code with ndarrays to be
+significantly slower:</p>
+<div class="highlight"><pre><span class="k">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="k">cimport</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="k">cimport</span> <span class="nn">cython</span>
+
+<span class="nd">@cython</span><span class="o">.</span><span class="n">boundscheck</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
+<span class="nd">@cython</span><span class="o">.</span><span class="n">wraparound</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
+<span class="k">cdef</span> <span class="kr">inline</span> <span class="kt">double</span> <span class="nf">inner_func</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">[</span><span class="n">double</span><span class="p">,</span> <span class="n">ndim</span><span class="o">=</span><span class="mf">2</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s">&#39;c&#39;</span><span class="p">]</span> <span class="n">X</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">X</span><span class="p">[</span><span class="mf">0</span><span class="p">,</span> <span class="mf">0</span><span class="p">]</span>
+
+<span class="k">def</span> <span class="nf">loop_3</span><span class="p">(</span><span class="nb">int</span> <span class="n">N</span><span class="p">,</span> <span class="n">switch</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+    <span class="k">cdef</span> <span class="kt">np</span>.<span class="kt">ndarray</span>[<span class="nf">double</span><span class="p">,</span> <span class="nf">ndim</span><span class="o">=</span><span class="mf">2</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s">&#39;c&#39;</span><span class="p">]</span> <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mf">100</span><span class="p">,</span> <span class="mf">100</span><span class="p">))</span>
+    <span class="k">cdef</span> <span class="kt">int</span> <span class="nf">i</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">):</span>
+        <span class="n">inner_func</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+</pre></div>
+
+
+<p>Compiling this gives the following warning:</p>
+<div class="highlight"><pre><span class="n">warning</span><span class="o">:</span> <span class="n">Buffer</span> <span class="n">unpacking</span> <span class="n">not</span> <span class="n">optimized</span> <span class="n">away</span><span class="o">.</span>
+</pre></div>
+
+
+<p>The result of this buffer unpacking in each loop is a much slower execution
+time:</p>
+<div class="highlight"><pre><span class="c">%timeit loop_3(1E6)</span>
+<span class="mi">1</span> <span class="n">loops</span><span class="p">,</span> <span class="n">best</span> <span class="n">of</span> <span class="mi">3</span><span class="p">:</span> <span class="mi">617</span> <span class="n">ms</span> <span class="n">per</span> <span class="n">loop</span>
+</pre></div>
+
+
+<p>This is about 30 times slower than the non-inlined version of the memoryview,
+and 6000 times slower than the inlined memoryview above!
+Is there any way around this?
+Well, there are two options: raw pointers, or explicit inlining in the
+code (that is, copying and pasting your code).  Both options will have
+speeds similar to that of the inlined memoryviews, but each solution
+is inconvenient in its own way.</p>
+<p>So why wouldn't you use memoryviews?  Well, several projects strive to
+remain compatible with python 2.4 (one example is scipy) and python 2.4 is
+not compatible with cython's typed memoryviews.  Other projects seek to
+remain compatible with earlier cython versions which don't support
+the relatively new memoryview syntax.
+In these situations, one of the two partial solutions above
+probably need to be used.  In practice, I have usually resorted to passing
+around raw pointers.</p>
+<h3>Summary</h3>
+<p>Here are the timings we found above:</p>
+<ul>
+<li>Inlined memoryviews: 0.1 ms</li>
+<li>Non-inlined memoryviews: 22.9 ms</li>
+<li>Inlined ndarray: 617 ms</li>
+</ul>
+<p>So we see yet another reason that typed memoryviews are superior to
+the ndarray syntax: they not only have very speedy slicing, but also
+play well with the compiler's inlining optimization.  Granted, these
+time differences will be insignificant if your inlined function does
+some non-negligible amount of computation, but there may be situations
+where this affects things.</p>
+<h3>Back to my problem</h3>
+<p>If you recall, I started all of this because I wanted to create a binary tree
+that can compute pairwise distances with arbitrary distance metrics.  Where
+do these results put me?  Not in a great position, it turns out.  Abstracting
+out the distance function so that the same machinery can be used with
+different functions will lead to speed penalties from the inability to inline.
+C++ libraries accomplish this through compile-time conditionals (i.e. templates)
+but cython doesn't have this capability.  Duplicating the tree
+framework with a new hard-coded (and thus inlinable) distance metric may
+be the only option.  That, or wrapping a templated C++ implementation.</p>
+<p>All of the above scripts are available as an ipython
+notebook: <a href="/downloads/notebooks/memview_bench_2.ipynb">memview_bench_2.ipynb</a>.
+For information on how to view this file, see the
+<a href="http://ipython.org/ipython-doc/dev/interactive/htmlnotebook.html">IPython page</a>
+Alternatively, you can view this notebook (but not modify it) using the
+nbviewer <a href="http://nbviewer.ipython.org/url/jakevdp.github.com/downloads/notebooks/memview_bench_2.ipynb">here</a>.</p>
+  </div><!-- /.entry-content -->
+</section>
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>,
+                which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+        </footer><!-- /#contentinfo -->
+</body>
+</html>

@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+          <title>Pythonic Perambulations</title>
+        <meta charset="utf-8" />
+        <link href="/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="Pythonic Perambulations Full Atom Feed" />
+        <link href="/atom.xml" type="application/atom+xml" rel="alternate" title="Pythonic Perambulations Atom Feed" />
+        <link href="/feeds/misc.atom.xml" type="application/atom+xml" rel="alternate" title="Pythonic Perambulations Categories Atom Feed" />
+
+
+
+
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="/">Pythonic Perambulations <strong>Musings and ramblings through the world of Python and beyond</strong></a></h1>
+        </header><!-- /#banner -->
+        <nav id="menu"><ul>
+            <li><a href="/archives.html">Archives</a></li>
+            <li><a href="http://www.astro.washington.edu/users/vanderplas">Home Page</a></li>
+              <li class="active"><a href="/category/misc.html">misc</a></li>
+        </ul></nav><!-- /#menu -->
+<section id="content" class="body">
+  <header>
+    <h2 class="entry-title">
+      <a href="/blog/2012/09/12/dynamic-programming-in-python/" rel="bookmark"
+         title="Permalink to Dynamic Programming in Python: Bayesian Blocks">Dynamic Programming in Python: Bayesian Blocks</a></h2>
+ 
+  </header>
+  <footer class="post-info">
+    <abbr class="published" title="2012-09-12T19:02:00-07:00">
+       9 12, 2012
+    </abbr>
+    <address class="vcard author">
+      By           <a class="url fn" href="/author/jake-vanderplas.html">Jake Vanderplas</a>
+    </address>
+  </footer><!-- /.post-info -->
+  <div class="entry-content">
+    <!-- PELICAN_BEGIN_SUMMARY -->
+
+<p>Of all the programming styles I have learned,
+<a href="http://en.wikipedia.org/wiki/Dynamic_programming">dynamic programming</a>
+is perhaps the most beautiful.  It can take problems that, at first glance,
+look ugly and intractable, and solve the problem with clean, concise code.
+Where a simplistic algorithm might accomplish something by brute force,
+dynamic programming steps back, breaks the task into a smaller set of
+sequential parts, and then proceeds in the most efficient way possible.</p>
+<h3>Bayesian Blocks</h3>
+<p>I'll go through an example here where the ideas of dynamic programming
+are vital to some very cool data analysis resuts.
+This post draws heavily from a recent
+<a href="http://adsabs.harvard.edu/abs/2012arXiv1207.5578S">paper</a> by Jeff Scargle
+and collaborators (this is the Scargle of <em>Lomb-Scargle Periodogram</em>
+fame), as well as some conversations I had with Jeff at
+<a href="http://www.astro.caltech.edu/ai12/">Astroinformatics 2012</a>.
+The paper discusses
+a framework called <em>Bayesian Blocks</em>, which is essentially a method of
+creating histograms with bin sizes that adapt to the data (there's a bit
+more to it than that: here we'll focus on histograms for simplicity).</p>
+<!-- PELICAN_END_SUMMARY -->
+
+<p>To motivate this, let's take a look at the histogram of some sampled data.
+We'll create a complicated set of random data in the following way:</p>
+<div class="highlight"><pre><span class="c"># Define our test distribution: a mix of Cauchy-distributed variables</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">scipy</span> <span class="kn">import</span> <span class="n">stats</span>
+
+<span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">stats</span><span class="o">.</span><span class="n">cauchy</span><span class="p">(</span><span class="o">-</span><span class="mi">5</span><span class="p">,</span> <span class="mf">1.8</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">500</span><span class="p">),</span>
+                    <span class="n">stats</span><span class="o">.</span><span class="n">cauchy</span><span class="p">(</span><span class="o">-</span><span class="mi">4</span><span class="p">,</span> <span class="mf">0.8</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">2000</span><span class="p">),</span>
+                    <span class="n">stats</span><span class="o">.</span><span class="n">cauchy</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">500</span><span class="p">),</span>
+                    <span class="n">stats</span><span class="o">.</span><span class="n">cauchy</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mf">0.8</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">1000</span><span class="p">),</span>
+                    <span class="n">stats</span><span class="o">.</span><span class="n">cauchy</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">)</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="mi">500</span><span class="p">)])</span>
+
+<span class="c"># truncate values to a reasonable range</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">x</span><span class="p">[(</span><span class="n">x</span> <span class="o">&gt;</span> <span class="o">-</span><span class="mi">15</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">x</span> <span class="o">&lt;</span> <span class="mi">15</span><span class="p">)]</span>
+</pre></div>
+
+
+<p>Now what does this distribution look like?  We can plot a histogram to find
+out:</p>
+<div class="highlight"><pre><span class="kn">import</span> <span class="nn">pylab</span> <span class="kn">as</span> <span class="nn">pl</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">normed</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+</pre></div>
+
+
+<p>{% img /figures/bayesblocks1.png [Simple Histogram of our Distribution] %}</p>
+<p>Not too informative.  The default bins in <code>matplotlib</code> are too wide for this
+dataset.  We might be able to do better by increasing the number of bins:</p>
+<div class="highlight"><pre><span class="n">pl</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">normed</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+</pre></div>
+
+
+<p>{% img /figures/bayesblocks2.png [More Detailed Histogram of our Distribution] %}</p>
+<p>This is better.  But having to choose the bin width each time we plot a
+distribution is not only tiresome, it may lead to missing some important
+information in our data.  In a perfect world, we'd like for
+the bin width to be learned in an automated fashion, based on the
+properties of the data itself.
+There have been many rules-of-thumb proposed for this task
+(look up <em>Scott's Rule</em>, <em>Knuth's Rule</em>, the <em>Freedman-Diaconis Rule</em>,
+and others in your favorite statistics text).
+But all these rules of thumb share a disadvantage: they make the assumption
+that all the bins are the same size.  This is not necessarily optimal.  But
+can we do better?</p>
+<p>Scargle and collaborators showed that the answer is yes.  This is their insight:
+For a set of histogram bins or <em>blocks</em>, each of an arbitrary size,
+one can use a Bayesian
+likelihood framework to compute a <em>fitness function</em> which only depends on
+two numbers: the width of each block, and the number of points in each block.
+The edges between these blocks (the <em>change-points</em>) can be varied, and
+the overall block configuration with the maximum fitness is quantitatively
+the best binning.</p>
+<p>Simple, right?</p>
+<p>Well, no.  The problem is, as the number of points N grows large, the number
+of possible configurations grows as $2^N$.  For N=300 points, there are already
+more possible configurations than the number of subatomic particles in the
+observable universe!  Clearly an exhaustive search will fail in cases of
+interest.  This is where <em>dynamic programming</em> comes to the rescue.</p>
+<h3>Dynamic Programming</h3>
+<p>Dynamic programming is very similar to mathematical proof by induction. By
+way of example, consider the formula</p>
+<p>$$1 + 2 + \cdots + n = \frac{n(n+1)}{2}.$$</p>
+<p>How could you prove that this is true for all positive integers $n$?
+An inductive proof of this formula proceeds in the following fashion:</p>
+<ol>
+<li>
+<p><strong>Base Case</strong>: We can easily show that the formula holds for $n = 1$.</p>
+</li>
+<li>
+<p><strong>Inductive Step</strong>: For some value $k$, assume that
+   $1 + 2 + \cdots + k = \frac{k(k+1)}{2}$ holds.
+   Adding $(k + 1)$ to each side and rearranging the result yields
+   $1 + 2 + \cdots + k + (k + 1) = \frac{(k + 1)(k + 2)}{2}$.  Looking
+   closely at this, we see that we have shown the following:
+   if our formula is true for $k$, then it must be true for $k + 1$.</p>
+</li>
+<li>By 1 and 2, we can show that the formula is true for any positive integer
+   $n$, simply by starting at $n=1$ and repeating the inductive step
+   $n - 1$ times.</li>
+</ol>
+<p>Dynamic programming proceeds in much the same vein.  In our Bayesian Blocks
+example, we can easily find the optimal binning for a single point.  By
+making use of some mathematical proofs concerning the fitness functions,
+we can devise a simple step from the optimal binning for $k$ points to the
+optimal binning for $k + 1$ points (the details can be found in the
+appendices of the
+<a href="http://adsabs.harvard.edu/abs/2012arXiv1207.5578S">Scargle paper</a>).
+In this way, Scargle and collaborators showed that the $2^N$ possible states
+can be explored in $N^2$ time.</p>
+<h3>The Algorithm</h3>
+<p>The resulting algorithm is deceptively simple, but it can be proven to converge
+to the single best configuration among the $2^N$ possibilities.  Below is the
+basic code written in python.  Note that there are a few details that are
+missing from this version (e.g. priors on the number of bins, other forms
+of fitness functions, etc.) but this gets the basic job done:</p>
+<div class="highlight"><pre><span class="k">def</span> <span class="nf">bayesian_blocks</span><span class="p">(</span><span class="n">t</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Bayesian Blocks Implementation</span>
+
+<span class="sd">    By Jake Vanderplas.  License: BSD</span>
+<span class="sd">    Based on algorithm outlined in http://adsabs.harvard.edu/abs/2012arXiv1207.5578S</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    t : ndarray, length N</span>
+<span class="sd">        data to be histogrammed</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    bins : ndarray</span>
+<span class="sd">        array containing the (N+1) bin edges</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    This is an incomplete implementation: it may fail for some</span>
+<span class="sd">    datasets.  Alternate fitness functions and prior forms can</span>
+<span class="sd">    be found in the paper listed above.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c"># copy and sort the array</span>
+    <span class="n">t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+    <span class="n">N</span> <span class="o">=</span> <span class="n">t</span><span class="o">.</span><span class="n">size</span>
+
+    <span class="c"># create length-(N + 1) array of cell edges</span>
+    <span class="n">edges</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">t</span><span class="p">[:</span><span class="mi">1</span><span class="p">],</span>
+                            <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">+</span> <span class="n">t</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]),</span>
+                            <span class="n">t</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">:]])</span>
+    <span class="n">block_length</span> <span class="o">=</span> <span class="n">t</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">edges</span>
+
+    <span class="c"># arrays needed for the iteration</span>
+    <span class="n">nn_vec</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">N</span><span class="p">)</span>
+    <span class="n">best</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="n">last</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
+
+    <span class="c">#-----------------------------------------------------------------</span>
+    <span class="c"># Start with first data cell; add one cell at each iteration</span>
+    <span class="c">#-----------------------------------------------------------------</span>
+    <span class="k">for</span> <span class="n">K</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">):</span>
+        <span class="c"># Compute the width and count of the final bin for all possible</span>
+        <span class="c"># locations of the K^th changepoint</span>
+        <span class="n">width</span> <span class="o">=</span> <span class="n">block_length</span><span class="p">[:</span><span class="n">K</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">block_length</span><span class="p">[</span><span class="n">K</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="n">count_vec</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">nn_vec</span><span class="p">[:</span><span class="n">K</span> <span class="o">+</span> <span class="mi">1</span><span class="p">][::</span><span class="o">-</span><span class="mi">1</span><span class="p">])[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="c"># evaluate fitness function for these possibilities</span>
+        <span class="n">fit_vec</span> <span class="o">=</span> <span class="n">count_vec</span> <span class="o">*</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">count_vec</span><span class="p">)</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">width</span><span class="p">))</span>
+        <span class="n">fit_vec</span> <span class="o">-=</span> <span class="mi">4</span>  <span class="c"># 4 comes from the prior on the number of changepoints</span>
+        <span class="n">fit_vec</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">+=</span> <span class="n">best</span><span class="p">[:</span><span class="n">K</span><span class="p">]</span>
+
+        <span class="c"># find the max of the fitness: this is the K^th changepoint</span>
+        <span class="n">i_max</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">fit_vec</span><span class="p">)</span>
+        <span class="n">last</span><span class="p">[</span><span class="n">K</span><span class="p">]</span> <span class="o">=</span> <span class="n">i_max</span>
+        <span class="n">best</span><span class="p">[</span><span class="n">K</span><span class="p">]</span> <span class="o">=</span> <span class="n">fit_vec</span><span class="p">[</span><span class="n">i_max</span><span class="p">]</span>
+
+    <span class="c">#-----------------------------------------------------------------</span>
+    <span class="c"># Recover changepoints by iteratively peeling off the last block</span>
+    <span class="c">#-----------------------------------------------------------------</span>
+    <span class="n">change_points</span> <span class="o">=</span>  <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
+    <span class="n">i_cp</span> <span class="o">=</span> <span class="n">N</span>
+    <span class="n">ind</span> <span class="o">=</span> <span class="n">N</span>
+    <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+        <span class="n">i_cp</span> <span class="o">-=</span> <span class="mi">1</span>
+        <span class="n">change_points</span><span class="p">[</span><span class="n">i_cp</span><span class="p">]</span> <span class="o">=</span> <span class="n">ind</span>
+        <span class="k">if</span> <span class="n">ind</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">break</span>
+        <span class="n">ind</span> <span class="o">=</span> <span class="n">last</span><span class="p">[</span><span class="n">ind</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="n">change_points</span> <span class="o">=</span> <span class="n">change_points</span><span class="p">[</span><span class="n">i_cp</span><span class="p">:]</span>
+
+    <span class="k">return</span> <span class="n">edges</span><span class="p">[</span><span class="n">change_points</span><span class="p">]</span>
+</pre></div>
+
+
+<p>The details of the step from $K$ to $K + 1$ may be a bit confusing from this
+implementation: it boils down to the fact that Scargle <em>et al.</em> were able to
+show that given an optimal configuration of $K$ points, the $(K + 1)$^th
+configuration is limited to one of $K$ possibilities.</p>
+<p>The function as written above takes a sequence of points, and returns the
+edges of the optimal bins.  We'll visualize the result on top of the histogram
+we saw earlier:</p>
+<div class="highlight"><pre><span class="c"># plot a standard histogram in the background, with alpha transparency</span>
+<span class="n">H1</span> <span class="o">=</span> <span class="n">hist</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">histtype</span><span class="o">=</span><span class="s">&#39;stepfilled&#39;</span><span class="p">,</span>
+          <span class="n">alpha</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">normed</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+<span class="c"># plot an adaptive-width histogram on top</span>
+<span class="n">H2</span> <span class="o">=</span> <span class="n">hist</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="n">bayesian_blocks</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="n">color</span><span class="o">=</span><span class="s">&#39;black&#39;</span><span class="p">,</span>
+          <span class="n">histtype</span><span class="o">=</span><span class="s">&#39;step&#39;</span><span class="p">,</span> <span class="n">normed</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+</pre></div>
+
+
+<p>{% img /figures/bayesblocks3.png [Adaptive Histogram of our Distribution] %}</p>
+<p>The adaptive-width bins lead to a very clean representation of the important
+features in the data.  More importantly, these bins are quantifiably optimal,
+and their properties can be used to make quantitative statistical
+statements about the nature of the data.  This type of procedure has proven
+very useful in analysis of time-series data in Astronomy.</p>
+<h3>Conclusion</h3>
+<p>We've just scratched the surface of Bayesian Blocks and Dynamic Programming.
+Some of the more interesting details of this algorithm require much more
+depth: the appendicies of the
+<a href="http://adsabs.harvard.edu/abs/2012arXiv1207.5578S">Scargle paper</a>
+provide these details.  Dynamic Programming ideas have been shown to be
+useful in many optimization problems.  One other example I've worked with
+extensively is
+<a href="http://en.wikipedia.org/wiki/Dijkstra%27s_algorithm">Dijkstra's Algorithm</a>
+for computing the shortest paths on a connected graph.  This is available in
+the <a href="http://docs.scipy.org/doc/scipy/reference/tutorial/csgraph.html">scipy.sparse.csgraph</a>
+submodule, which is included in the most recent release of scipy.</p>
+<p>The above python implementation of Bayesian Blocks
+is an extremely basic form of the algorithm: I plan to include some
+more sophisticated options in the python package I'm currently
+working on, called <em>astroML: Machine Learning for Astrophysics</em>.
+I'll release version 0.1 of astroML at the end of October 2012,
+in time to present it at <a href="http://c3.nasa.gov/dashlink/events/1/">CIDU 2012</a>.
+If you're interested, I'll have updates here on the blog, as well as on
+my <a href="http://twitter.com/jakevdp">twitter feed</a>.</p>
+<p><em>Update: astroML version 0.1 has been released: see the web site
+<a href="http://astroML.github.com">here</a>.  It includes a full-featured Bayesian
+blocks implementation with histogram tools, which you can read about
+<a href="http://astroml.github.com/user_guide/density_estimation.html#bayesian-blocks-histograms-the-right-way">here</a>.</em></p>
+<p>Finally, all of the above code snippets are available as an ipython
+notebook: <a href="/downloads/notebooks/bayesian_blocks.ipynb">bayesian_blocks.ipynb</a>.
+For information on how to view this file, see the
+<a href="http://ipython.org/ipython-doc/dev/interactive/htmlnotebook.html">IPython page</a>.
+Alternatively, you can view this notebook (but not modify it) using the
+nbviewer utility <a href="http://nbviewer.ipython.org/url/jakevdp.github.com/downloads/notebooks/bayesian_blocks.ipynb">here</a>.</p>
+  </div><!-- /.entry-content -->
+</section>
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>,
+                which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+        </footer><!-- /#contentinfo -->
+</body>
+</html>

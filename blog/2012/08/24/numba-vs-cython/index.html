@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+          <title>Pythonic Perambulations</title>
+        <meta charset="utf-8" />
+        <link href="/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="Pythonic Perambulations Full Atom Feed" />
+        <link href="/atom.xml" type="application/atom+xml" rel="alternate" title="Pythonic Perambulations Atom Feed" />
+        <link href="/feeds/misc.atom.xml" type="application/atom+xml" rel="alternate" title="Pythonic Perambulations Categories Atom Feed" />
+
+
+
+
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="/">Pythonic Perambulations <strong>Musings and ramblings through the world of Python and beyond</strong></a></h1>
+        </header><!-- /#banner -->
+        <nav id="menu"><ul>
+            <li><a href="/archives.html">Archives</a></li>
+            <li><a href="http://www.astro.washington.edu/users/vanderplas">Home Page</a></li>
+              <li class="active"><a href="/category/misc.html">misc</a></li>
+        </ul></nav><!-- /#menu -->
+<section id="content" class="body">
+  <header>
+    <h2 class="entry-title">
+      <a href="/blog/2012/08/24/numba-vs-cython/" rel="bookmark"
+         title="Permalink to Numba vs Cython">Numba vs Cython</a></h2>
+ 
+  </header>
+  <footer class="post-info">
+    <abbr class="published" title="2012-08-24T10:41:00-07:00">
+       8 24, 2012
+    </abbr>
+    <address class="vcard author">
+      By           <a class="url fn" href="/author/jake-vanderplas.html">Jake Vanderplas</a>
+    </address>
+  </footer><!-- /.post-info -->
+  <div class="entry-content">
+    <!-- PELICAN_BEGIN_SUMMARY -->
+
+<p><em>For a more up-to-date comparison of Numba and Cython, see the</em>
+<a href="http://jakevdp.github.io/blog/2013/06/15/numba-vs-cython-take-2/"><em>newer post</em></a>
+<em>on this subject.</em></p>
+<p>Often I'll tell people that I use python for computational analysis, and they
+look at me inquisitively.  "Isn't python pretty slow?"  They have a point.
+Python is an interpreted language, and as such cannot natively perform
+many operations as quickly as a compiled language such as C or Fortran.
+There is also the issue of the oft-misunderstood and much-maligned
+<a href="http://wiki.python.org/moin/GlobalInterpreterLock">GIL</a>,
+which calls into question python's ability to allow true parallel computing.</p>
+<p>Many solutions have been proposed: <a href="http://pypy.org/">PyPy</a> is a much faster
+version of the core python language; 
+<a href="http://code.google.com/p/numexpr/">numexpr</a> provides optimized performance
+on certain classes of operations from within python;
+<a href="http://www.scipy.org/Weave/">weave</a> allows inline inclusion of compiled
+C/C++ code;
+<a href="http://www.cython.org/">cython</a> provides extra markup that allows python
+and/or python-like code to be compiled into C for fast operations.  But
+a naysayer might point out: many of these "python" solutions in practice
+are not really python at all, but clever hacks into Fortran or C.</p>
+<!-- PELICAN_END_SUMMARY -->
+
+<p>I personally have no problem with this. I like python because it gives me a nice
+work-flow: it has a clean syntax, I don't need to spend my time hunting down
+memory errors, it's quick to try-out code snippets, it's easy to wrap legacy
+code written in C and Fortran, and I'm much more productive when writing
+python vs writing C or C++.  <a href="http://numpy.scipy.org">Numpy</a>,
+<a href="http://www.scipy.org">scipy</a>, and <a href="http://www.scikit-learn.org">scikit-learn</a>
+give me optimized routines for most of what I need to do on a daily basis,
+and if something more specialized comes up, cython has never failed me.
+Nevertheless, the whole setup is a bit clunky:
+why can't I have the best of both worlds: a beautiful, scripted, dynamically
+typed language like python, with the speed of C or Fortran?</p>
+<p>In recent years, new languages like <a href="http://golang.org/">go</a> and
+<a href="http://julialang.org/">julia</a> have popped up which try to address some of
+these issues.  Julia in particular has a number of nice properties (see the
+<a href="http://www.youtube.com/watch?v=VCp1jUgVRgE">talk</a> from Scipy 2012 for a
+good introduction) and uses <a href="http://llvm.org">LLVM</a> to enable just-in-time
+(JIT) compilation and achieve some impressive benchmarks.  Julia holds promise,
+but I'm not yet ready to abandon the incredible code-base and user-base
+of the python community.</p>
+<p>Enter <a href="http://numba.pydata.org/">numba</a>.  This is an attempt to bring JIT
+compilation cleanly to python, using the LLVM framework.  In a
+<a href="/blog/2012/08/08/memoryview-benchmarks/">recent post</a>, one commenter pointed
+out numba as an alternative to cython.  I had heard about it before (See
+Travis Oliphant's scipy 2012 talk
+<a href="http://www.youtube.com/watch?v=WYi1cymszqY">here</a>) but hadn't had the chance
+to try it out until now. Installation is a bit involved, but the directions
+on the <a href="http://numba.pydata.org/">numba website</a> are pretty good.</p>
+<p>To test this out, I decided to run some benchmarks using the
+pairwise distance function I've explored before (see posts
+<a href="/blog/2012/08/08/memoryview-benchmarks/">here</a>
+and <a href="/blog/2012/08/16/memoryview-benchmarks-2/">here</a>).</p>
+<h3>Pure Python Version</h3>
+<p>The pure python version of the function looks like this:</p>
+<div class="highlight"><pre><span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+
+<span class="k">def</span> <span class="nf">pairwise_python</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">D</span><span class="p">):</span>
+    <span class="n">M</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">N</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">M</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">M</span><span class="p">):</span>
+            <span class="n">d</span> <span class="o">=</span> <span class="mf">0.0</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">):</span>
+                <span class="n">tmp</span> <span class="o">=</span> <span class="n">X</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">k</span><span class="p">]</span> <span class="o">-</span> <span class="n">X</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">k</span><span class="p">]</span>
+                <span class="n">d</span> <span class="o">+=</span> <span class="n">tmp</span> <span class="o">*</span> <span class="n">tmp</span>
+            <span class="n">D</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+</pre></div>
+
+
+<p>Not surprisingly, this is very slow.  For an array consisting of 1000 points
+in three dimensions, execution takes over 12 seconds on my machine:</p>
+<div class="highlight"><pre><span class="n">In</span> <span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">:</span> <span class="n">import</span> <span class="n">numpy</span> <span class="n">as</span> <span class="n">np</span>
+<span class="n">In</span> <span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="o">:</span> <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">random</span><span class="p">.</span><span class="n">random</span><span class="p">((</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+<span class="n">In</span> <span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="o">:</span> <span class="n">D</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">))</span>
+<span class="n">In</span> <span class="p">[</span><span class="mi">5</span><span class="p">]</span><span class="o">:</span> <span class="o">%</span><span class="n">timeit</span> <span class="n">pairwise_python</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">D</span><span class="p">)</span>
+<span class="mi">1</span> <span class="n">loops</span><span class="p">,</span> <span class="n">best</span> <span class="n">of</span> <span class="mi">3</span><span class="o">:</span> <span class="mf">12.1</span> <span class="n">s</span> <span class="n">per</span> <span class="n">loop</span>
+</pre></div>
+
+
+<h3>Numba Version</h3>
+<p>Once numba is installed, we add only a single line to our above definition
+to allow numba to interface our code with LLVM:</p>
+<div class="highlight"><pre><span class="n">import</span> <span class="n">numpy</span> <span class="n">as</span> <span class="n">np</span>
+<span class="n">from</span> <span class="n">numba</span> <span class="n">import</span> <span class="kt">double</span>
+<span class="n">from</span> <span class="n">numba</span><span class="p">.</span><span class="n">decorators</span> <span class="n">import</span> <span class="n">jit</span>
+
+<span class="err">@</span><span class="n">jit</span><span class="p">(</span><span class="n">arg_types</span><span class="o">=</span><span class="p">[</span><span class="kt">double</span><span class="p">[</span><span class="o">:</span><span class="p">,</span><span class="o">:</span><span class="p">],</span> <span class="kt">double</span><span class="p">[</span><span class="o">:</span><span class="p">,</span><span class="o">:</span><span class="p">]])</span>
+<span class="n">def</span> <span class="n">pairwise_numba</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">D</span><span class="p">)</span><span class="o">:</span>
+    <span class="n">M</span> <span class="o">=</span> <span class="n">X</span><span class="p">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">N</span> <span class="o">=</span> <span class="n">X</span><span class="p">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="n">in</span> <span class="n">range</span><span class="p">(</span><span class="n">M</span><span class="p">)</span><span class="o">:</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="n">in</span> <span class="n">range</span><span class="p">(</span><span class="n">M</span><span class="p">)</span><span class="o">:</span>
+            <span class="n">d</span> <span class="o">=</span> <span class="mf">0.0</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="n">in</span> <span class="n">range</span><span class="p">(</span><span class="n">N</span><span class="p">)</span><span class="o">:</span>
+                <span class="n">tmp</span> <span class="o">=</span> <span class="n">X</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">k</span><span class="p">]</span> <span class="o">-</span> <span class="n">X</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">k</span><span class="p">]</span>
+                <span class="n">d</span> <span class="o">+=</span> <span class="n">tmp</span> <span class="o">*</span> <span class="n">tmp</span>
+            <span class="n">D</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+</pre></div>
+
+
+<p>I should emphasize that this is the <em>exact same</em> code, except for numba's
+<code>jit</code> decorator.  The results are pretty astonishing:</p>
+<div class="highlight"><pre><span class="n">In</span> <span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">:</span> <span class="n">import</span> <span class="n">numpy</span> <span class="n">as</span> <span class="n">np</span>
+<span class="n">In</span> <span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="o">:</span> <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">random</span><span class="p">.</span><span class="n">random</span><span class="p">((</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+<span class="n">In</span> <span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="o">:</span> <span class="n">D</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">))</span>
+<span class="n">In</span> <span class="p">[</span><span class="mi">5</span><span class="p">]</span><span class="o">:</span> <span class="o">%</span><span class="n">timeit</span> <span class="n">pairwise_numba</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">D</span><span class="p">)</span>
+<span class="mi">100</span> <span class="n">loops</span><span class="p">,</span> <span class="n">best</span> <span class="n">of</span> <span class="mi">3</span><span class="o">:</span> <span class="mf">15.5</span> <span class="n">ms</span> <span class="n">per</span> <span class="n">loop</span>
+</pre></div>
+
+
+<p>This is a three order-of-magnitude speedup, simply by adding a numba
+decorator!</p>
+<h3>Cython Version</h3>
+<p>For completeness, let's do the same thing in cython.  Cython
+takes a bit more than just some decorators: there are also type specifiers
+and other imports required.  Additionally, we'll use the <code>sqrt</code> function
+from the C math library rather than from numpy.  Here's the code:</p>
+<div class="highlight"><pre><span class="k">cimport</span> <span class="nn">cython</span>
+<span class="k">from</span> <span class="nn">libc.math</span> <span class="k">cimport</span> <span class="n">sqrt</span>
+
+<span class="nd">@cython</span><span class="o">.</span><span class="n">boundscheck</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
+<span class="nd">@cython</span><span class="o">.</span><span class="n">wraparound</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">pairwise_cython</span><span class="p">(</span><span class="n">double</span><span class="p">[:,</span> <span class="p">::</span><span class="mf">1</span><span class="p">]</span> <span class="n">X</span><span class="p">,</span> <span class="n">double</span><span class="p">[:,</span> <span class="p">::</span><span class="mf">1</span><span class="p">]</span> <span class="n">D</span><span class="p">):</span>
+    <span class="k">cdef</span> <span class="kt">int</span> <span class="nf">M</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mf">0</span><span class="p">]</span>
+    <span class="k">cdef</span> <span class="kt">int</span> <span class="nf">N</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mf">1</span><span class="p">]</span>
+    <span class="k">cdef</span> <span class="kt">double</span> <span class="nf">tmp</span><span class="p">,</span> <span class="nf">d</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">M</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">M</span><span class="p">):</span>
+            <span class="n">d</span> <span class="o">=</span> <span class="mf">0.0</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N</span><span class="p">):</span>
+                <span class="n">tmp</span> <span class="o">=</span> <span class="n">X</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">k</span><span class="p">]</span> <span class="o">-</span> <span class="n">X</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">k</span><span class="p">]</span>
+                <span class="n">d</span> <span class="o">+=</span> <span class="n">tmp</span> <span class="o">*</span> <span class="n">tmp</span>
+            <span class="n">D</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+</pre></div>
+
+
+<p>Running this shows about a 30% speedup over numba:</p>
+<div class="highlight"><pre><span class="n">In</span> <span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">:</span> <span class="n">import</span> <span class="n">numpy</span> <span class="n">as</span> <span class="n">np</span>
+<span class="n">In</span> <span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="o">:</span> <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">random</span><span class="p">.</span><span class="n">random</span><span class="p">((</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+<span class="n">In</span> <span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="o">:</span> <span class="n">D</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">))</span>
+<span class="n">In</span> <span class="p">[</span><span class="mi">5</span><span class="p">]</span><span class="o">:</span> <span class="o">%</span><span class="n">timeit</span> <span class="n">pairwise_numba</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">D</span><span class="p">)</span>
+<span class="mi">100</span> <span class="n">loops</span><span class="p">,</span> <span class="n">best</span> <span class="n">of</span> <span class="mi">3</span><span class="o">:</span> <span class="mf">9.86</span> <span class="n">ms</span> <span class="n">per</span> <span class="n">loop</span>
+</pre></div>
+
+
+<h3>The Takeaway</h3>
+<p>So numba is 1000 times faster than a pure python implementation, and only
+marginally slower than nearly identical cython code.
+There are some caveats here: first of all, I have years of experience with
+cython, and only an hour's experience with numba.  I've used every optimization
+I know for the cython version, and just the basic vanilla syntax for numba.
+There are likely ways to tweak the numba version to make it even faster,
+as indicated in the comments of
+<a href="/blog/2012/08/08/memoryview-benchmarks/">this post</a>.</p>
+<p>All in all, I should say I'm very impressed.  Using numba, I added
+just a <em>single line</em> to the original python code, and
+was able to attain speeds competetive with a highly-optimized (and
+significantly less "pythonic")  cython implementation.  Based on this,
+I'm extremely excited to see what numba brings in the future.</p>
+<p>All the above code is available as an ipython notebook:
+<a href="/downloads/notebooks/numba_vs_cython.ipynb">numba_vs_cython.ipynb</a>.
+For information on how to view this file, see the
+<a href="http://ipython.org/ipython-doc/dev/interactive/htmlnotebook.html">IPython page</a>
+Alternatively, you can view this notebook (but not modify it) using the
+nbviewer <a href="http://nbviewer.ipython.org/url/jakevdp.github.com/downloads/notebooks/numba_vs_cython.ipynb">here</a>.</p>
+  </div><!-- /.entry-content -->
+</section>
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>,
+                which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+        </footer><!-- /#contentinfo -->
+</body>
+</html>

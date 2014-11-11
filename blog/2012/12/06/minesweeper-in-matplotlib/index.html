@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+          <title>Pythonic Perambulations</title>
+        <meta charset="utf-8" />
+        <link href="/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="Pythonic Perambulations Full Atom Feed" />
+        <link href="/atom.xml" type="application/atom+xml" rel="alternate" title="Pythonic Perambulations Atom Feed" />
+        <link href="/feeds/misc.atom.xml" type="application/atom+xml" rel="alternate" title="Pythonic Perambulations Categories Atom Feed" />
+
+
+
+
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="/">Pythonic Perambulations <strong>Musings and ramblings through the world of Python and beyond</strong></a></h1>
+        </header><!-- /#banner -->
+        <nav id="menu"><ul>
+            <li><a href="/archives.html">Archives</a></li>
+            <li><a href="http://www.astro.washington.edu/users/vanderplas">Home Page</a></li>
+              <li class="active"><a href="/category/misc.html">misc</a></li>
+        </ul></nav><!-- /#menu -->
+<section id="content" class="body">
+  <header>
+    <h2 class="entry-title">
+      <a href="/blog/2012/12/06/minesweeper-in-matplotlib/" rel="bookmark"
+         title="Permalink to Minesweeper in Matplotlib">Minesweeper in Matplotlib</a></h2>
+ 
+  </header>
+  <footer class="post-info">
+    <abbr class="published" title="2012-12-06T18:23:00-08:00">
+      12 06, 2012
+    </abbr>
+    <address class="vcard author">
+      By           <a class="url fn" href="/author/jake-vanderplas.html">Jake Vanderplas</a>
+    </address>
+  </footer><!-- /.post-info -->
+  <div class="entry-content">
+    <!-- PELICAN_BEGIN_SUMMARY -->
+
+<p>Lately I've been playing around with interactivity in matplotlib.  A couple
+weeks ago, I discussed briefly how to use event callbacks to implement
+<a href="/blog/2012/11/24/simple-3d-visualization-in-matplotlib/">simple 3D visualization</a>
+and later used this as a base for creating a
+<a href="/blog/2012/11/26/3d-interactive-rubiks-cube-in-python">working 3D Rubik's cube</a>
+entirely in matplotlib.</p>
+<p>Today I have a different goal: re-create
+<a href="http://en.wikipedia.org/wiki/Minesweeper_%28computer_game%29">minesweeper</a>,
+that ubiquitous single-player puzzle game that most of us will admit to
+having binged on at least once or twice in their lives.  In minesweeper, the
+goal is to discover and avoid hidden mines within a gridded minefield, and
+the process takes some logic and quick thinking.</p>
+<p>{% img /images/minesweeper_2.gif 800 %}</p>
+<!-- PELICAN_END_SUMMARY -->
+
+<p>To implement this in matplotlib, at its most stripped-down level, simply
+requires us to register mouse clicks on the plot window, and to have the
+window respond in the appropriate way.  The rest is just the logic underneath.</p>
+<h2>Event Callbacks</h2>
+<p>Matplotlib contains several built-in event callbacks.  You can register
+key presses (with <code>'key_press_event'</code> and <code>'key_release_event'</code>),
+mouse clicks (with <code>'button_press_event'</code> and <code>'button_release_event'</code>),
+mouse movement (with <code>'motion_notify_event'</code>), and much more.  For
+a full listing of the events that can be bound to functionality, see the
+documentation of the function <code>'matplotlib.pyplot.connect'</code>.</p>
+<p>As a simple example, here we'll create a polygon and a function which is called
+each time the axis is clicked.  The function <code>on_click</code> checks if the click
+occured within the polygon, and if so changes the polygon to a random
+color:</p>
+<div class="highlight"><pre><span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="kn">as</span> <span class="nn">plt</span>
+
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">111</span><span class="p">,</span> <span class="n">xlim</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">ylim</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+<span class="n">polygon</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">Polygon</span><span class="p">([[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]])</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">add_patch</span><span class="p">(</span><span class="n">polygon</span><span class="p">)</span>
+
+<span class="c"># Function to be called when mouse is clicked</span>
+<span class="k">def</span> <span class="nf">on_click</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">polygon</span><span class="o">.</span><span class="n">contains_point</span><span class="p">((</span><span class="n">event</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">event</span><span class="o">.</span><span class="n">y</span><span class="p">)):</span>
+        <span class="n">polygon</span><span class="o">.</span><span class="n">set_facecolor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+        <span class="n">fig</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">draw</span><span class="p">()</span>
+
+<span class="c"># Connect the click function to the button press event</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">mpl_connect</span><span class="p">(</span><span class="s">&#39;button_press_event&#39;</span><span class="p">,</span> <span class="n">on_click</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+
+
+<p>The result will look something like this:</p>
+<p>{% img /images/poly_color.gif  400 %}</p>
+<p>Checking whether a click event is within a polygon or any other artist is
+a very common pattern.  For this reason, matplotlib provides a built-in
+ <code>pick</code> event.  You can think of this as an event similar to a mouse click,
+but specifically generated by a plot artist when it is clicked.
+Furthermore, a <code>pick</code> event is associated back to that particular plot
+element, which can be easily referenced within the callback.
+Here is a code snippet which gives is equivalent to the code above,
+but uses pick events rather than button press events:</p>
+<div class="highlight"><pre><span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="kn">as</span> <span class="nn">plt</span>
+
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">111</span><span class="p">,</span> <span class="n">xlim</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">ylim</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+<span class="n">polygon</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">Polygon</span><span class="p">([[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]])</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">add_patch</span><span class="p">(</span><span class="n">polygon</span><span class="p">)</span>
+
+<span class="c"># set the picker to True, so that pick events are registered</span>
+<span class="n">polygon</span><span class="o">.</span><span class="n">set_picker</span><span class="p">(</span><span class="bp">True</span><span class="p">)</span>
+
+<span class="c"># create a function to be bound to pick events: here the event has an</span>
+<span class="c"># attribute `artist` which points to the object which was clicked</span>
+<span class="k">def</span> <span class="nf">on_pick</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>
+    <span class="n">event</span><span class="o">.</span><span class="n">artist</span><span class="o">.</span><span class="n">set_facecolor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">draw</span><span class="p">()</span>
+
+<span class="c"># bind pick events to our on_pick function</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">mpl_connect</span><span class="p">(</span><span class="s">&#39;pick_event&#39;</span><span class="p">,</span> <span class="n">on_pick</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+
+
+<p>Here we have used just a single polygon, but there's nothing to stop us
+from using multiple interactive polygons in a single window.  Add some
+logic beneath it all, and the results can be extremely flexible.  We'll
+go through one in-depth example below.</p>
+<h2>Minesweeper</h2>
+<p>Using this simple machinery, let's create a basic implementation of the game
+Minesweeper.  This involves creating a grid of polygons, with a certain number
+of them "containing" mines.  Clicking the left mouse button will "uncover"
+the square, ending the game if a mine is underneath.  If (as we'd hope)
+an uncovered square does not contain a mine, it will reveal a number
+reporting how many of the eight adjacent squares contain mines.
+The right mouse button is used to mark where we believe mines are.</p>
+<p>There are some other more sophisticated features in the below code --
+for example, clicking
+an already uncovered square with the correct number of adjacent mines marked
+will automatically clear the surrounding squares -- but rather than enumerating
+every programming decision, I'll just show you the code.  It's less than
+200 lines, but the results are pretty nice:</p>
+<p>{% img /images/minesweeper.gif 440 440 %}</p>
+<p>{% include_code minesweeper.py lang:python Minesweeper %}</p>
+<p>There are still some things missing from this which are present in any good
+minesweeper implementation: a timer, the ability to reset the game without
+restarting the program, the ability to keep track of fastest times, and
+likely some more things I haven't thought of.</p>
+<p>Regardless, this little script shows how incredibly powerful a framework
+matplotlib is.
+It can create an interactive Rubik's cube one day, publication-quality plots
+the next, and round out the season with a blast back to a classic Windows 3.1
+time-sink.  And for some reason, I find I have much more fun playing the
+minesweeper I built from scratch than the one that came with my system.</p>
+<p>Enjoy!</p>
+  </div><!-- /.entry-content -->
+</section>
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>,
+                which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+        </footer><!-- /#contentinfo -->
+</body>
+</html>

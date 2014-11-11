@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+          <title>Pythonic Perambulations</title>
+        <meta charset="utf-8" />
+        <link href="/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="Pythonic Perambulations Full Atom Feed" />
+        <link href="/atom.xml" type="application/atom+xml" rel="alternate" title="Pythonic Perambulations Atom Feed" />
+        <link href="/feeds/misc.atom.xml" type="application/atom+xml" rel="alternate" title="Pythonic Perambulations Categories Atom Feed" />
+
+
+
+
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="/">Pythonic Perambulations <strong>Musings and ramblings through the world of Python and beyond</strong></a></h1>
+        </header><!-- /#banner -->
+        <nav id="menu"><ul>
+            <li><a href="/archives.html">Archives</a></li>
+            <li><a href="http://www.astro.washington.edu/users/vanderplas">Home Page</a></li>
+              <li class="active"><a href="/category/misc.html">misc</a></li>
+        </ul></nav><!-- /#menu -->
+<section id="content" class="body">
+  <header>
+    <h2 class="entry-title">
+      <a href="/blog/2012/08/18/matplotlib-animation-tutorial/" rel="bookmark"
+         title="Permalink to Matplotlib Animation Tutorial">Matplotlib Animation Tutorial</a></h2>
+ 
+  </header>
+  <footer class="post-info">
+    <abbr class="published" title="2012-08-18T08:01:00-07:00">
+       8 18, 2012
+    </abbr>
+    <address class="vcard author">
+      By           <a class="url fn" href="/author/jake-vanderplas.html">Jake Vanderplas</a>
+    </address>
+  </footer><!-- /.post-info -->
+  <div class="entry-content">
+    <!-- PELICAN_BEGIN_SUMMARY -->
+
+<p><a href="http://matplotlib.sourceforge.net">Matplotlib</a> version 1.1 added some tools
+for creating
+<a href="http://matplotlib.sourceforge.net/api/animation_api.html">animations</a>
+which are really slick.  You can find some good example animations on
+the matplotlib
+<a href="http://matplotlib.sourceforge.net/examples/animation/index.html">examples</a>
+page.  I thought I'd share here some of the things I've learned when playing
+around with these tools.</p>
+<h3>Basic Animation</h3>
+<p>The animation tools center around the <code>matplotlib.animation.Animation</code> base
+class, which provides a framework around which the animation functionality
+is built.  The main interfaces are <code>TimedAnimation</code> and <code>FuncAnimation</code>,
+which you can read more about in the
+<a href="http://matplotlib.sourceforge.net/api/animation_api.html">documentation</a>.
+Here I'll explore using the <code>FuncAnimation</code> tool, which I have found
+to be the most useful.</p>
+<!-- PELICAN_END_SUMMARY -->
+
+<p>First we'll use <code>FuncAnimation</code> to do a basic animation of a sine wave moving
+across the screen:</p>
+<p>{% include_code basic_animation.py lang:python Basic Animation %}</p>
+<p>Let's step through this and see what's going on.  After importing required
+pieces of <code>numpy</code> and <code>matplotlib</code>, The script sets up the plot:</p>
+<div class="highlight"><pre><span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">axes</span><span class="p">(</span><span class="n">xlim</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">ylim</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+<span class="n">line</span><span class="p">,</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">([],</span> <span class="p">[],</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</pre></div>
+
+
+<p>Here we create a figure window, create a single axis in the figure, and then
+create our line object which will be modified in the animation.  Note that
+here we simply plot an empty line: we'll add data to the line later.</p>
+<p>Next we'll create the functions which make the animation happen.  <code>init()</code>
+is the function which will be called to create the base frame upon which
+the animation takes place.  Here we use just a simple function which sets
+the line data to nothing.  It is important that this function return the
+line object, because this tells the animator which objects on the plot to
+update after each frame:</p>
+<div class="highlight"><pre><span class="k">def</span> <span class="nf">init</span><span class="p">():</span>
+    <span class="n">line</span><span class="o">.</span><span class="n">set_data</span><span class="p">([],</span> <span class="p">[])</span>
+    <span class="k">return</span> <span class="n">line</span><span class="p">,</span>
+</pre></div>
+
+
+<p>The next piece is the animation function.  It takes a single parameter, the
+frame number <code>i</code>, and draws a sine wave with a shift that depends on <code>i</code>:</p>
+<div class="highlight"><pre><span class="err">#</span> <span class="nx">animation</span> <span class="kd">function</span><span class="p">.</span>  <span class="nx">This</span> <span class="nx">is</span> <span class="nx">called</span> <span class="nx">sequentially</span>
+<span class="nx">def</span> <span class="nx">animate</span><span class="p">(</span><span class="nx">i</span><span class="p">)</span><span class="o">:</span>
+    <span class="nx">x</span> <span class="o">=</span> <span class="nx">np</span><span class="p">.</span><span class="nx">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)</span>
+    <span class="nx">y</span> <span class="o">=</span> <span class="nx">np</span><span class="p">.</span><span class="nx">sin</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="nx">np</span><span class="p">.</span><span class="nx">pi</span> <span class="o">*</span> <span class="p">(</span><span class="nx">x</span> <span class="o">-</span> <span class="mf">0.01</span> <span class="o">*</span> <span class="nx">i</span><span class="p">))</span>
+    <span class="nx">line</span><span class="p">.</span><span class="nx">set_data</span><span class="p">(</span><span class="nx">x</span><span class="p">,</span> <span class="nx">y</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nx">line</span><span class="p">,</span>
+</pre></div>
+
+
+<p>Note that again here we return a tuple of the plot objects which have been
+modified.  This tells the animation framework what parts of the plot should
+be animated.</p>
+<p>Finally, we create the animation object:</p>
+<div class="highlight"><pre><span class="n">anim</span> <span class="o">=</span> <span class="n">animation</span><span class="o">.</span><span class="n">FuncAnimation</span><span class="p">(</span><span class="n">fig</span><span class="p">,</span> <span class="n">animate</span><span class="p">,</span> <span class="n">init_func</span><span class="o">=</span><span class="n">init</span><span class="p">,</span>
+                               <span class="n">frames</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">blit</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+</pre></div>
+
+
+<p>This object needs to persist, so it must be assigned to a variable.  We've
+chosen a 100 frame animation with a 20ms delay between frames.  The
+<code>blit</code> keyword is an important one: this tells the animation to only re-draw
+the pieces of the plot which have changed.  The time saved with <code>blit=True</code>
+means that the animations display much more quickly.</p>
+<p 270="270" 360="360" _="%" _downloads_videos_basic_animation.mp4="/downloads/videos/basic_animation.mp4" _downloads_videos_basic_animation_frame.png="/downloads/videos/basic_animation_frame.png" video="video">We end with an optional save command, and then a show command to show the
+result.  Here's what the script generates:</p>
+<p>This framework for generating and saving animations is very powerful and
+flexible: if we put some physics into the <code>animate</code> function, the possibilities
+are endless.  Below are a couple examples of some physics animations that
+I've been playing around with.</p>
+<h3>Double Pendulum</h3>
+<p>One of the examples provided on the matplotlib
+<a href="http://matplotlib.sourceforge.net/examples/animation/index.html">example page</a>
+is an animation of a double pendulum.  This example operates by precomputing
+the pendulum position over 10 seconds, and then animating the results.  I
+saw this and wondered if python would be fast enough to compute the dynamics
+on the fly.  It turns out it is:</p>
+<p>{% include_code double_pendulum.py lang:python Double Pendulum %}</p>
+<p>Here we've created a class which stores the state of the double pendulum
+(encoded in the angle of each arm plus the angular velocity of each arm)
+and also provides some functions for computing the dynamics.  The animation
+functions are the same as above, but we just have a bit more complicated
+update function: it not only changes the position of the points, but also
+changes the text to keep track of time and energy (energy should be constant
+if our math is correct: it's comforting that it is).  The video below
+lasts only ten seconds, but by running the script you can watch the
+pendulum chaotically oscillate until your laptop runs out of power:</p>
+<p>{% video /downloads/videos/double_pendulum.mp4 360 270 /downloads/videos/double_pendulum_frame.png %}</p>
+<h3>Particles in a Box</h3>
+<p>Another animation I created is the elastic collisions of a group of particles
+in a box under the force of gravity.  The collisions are elastic: they conserve
+energy and 2D momentum, and the particles bounce realistically off the walls
+of the box and fall under the influence of a constant gravitational force:</p>
+<p>{% include_code particle_box.py lang:python Particles in a Box %}</p>
+<p>The math should be familiar to anyone with a physics background, and the
+result is pretty mesmerizing.  I coded this up during a flight, and ended
+up just sitting and watching it for about ten minutes.</p>
+<p>{% video /downloads/videos/particle_box.mp4 360 270 /downloads/videos/particle_box_frame.png %}</p>
+<p>This is just the beginning: it might be an interesting exercise to add
+other elements, like computation of the temperature and pressure to demonstrate
+the ideal gas law, or real-time plotting of the velocity distribution to
+watch it approach the expected Maxwellian distribution.  It opens up many
+possibilities for virtual physics demos...</p>
+<h3>Summing it up</h3>
+<p>The matplotlib animation module is an excellent addition to what was already
+an excellent package.  I think I've just scratched the surface of what's
+possible with these tools... what cool animation ideas can you come up
+with?</p>
+<p>Edit: in a <a href="/blog/2012/09/05/quantum-python">followup post</a>, I show how
+these tools can be used to generate an animation of a simple Quantum
+Mechanical system.</p>
+  </div><!-- /.entry-content -->
+</section>
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>,
+                which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+        </footer><!-- /#contentinfo -->
+</body>
+</html>

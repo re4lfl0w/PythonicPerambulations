@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+          <title>Pythonic Perambulations</title>
+        <meta charset="utf-8" />
+        <link href="/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="Pythonic Perambulations Full Atom Feed" />
+        <link href="/atom.xml" type="application/atom+xml" rel="alternate" title="Pythonic Perambulations Atom Feed" />
+        <link href="/feeds/misc.atom.xml" type="application/atom+xml" rel="alternate" title="Pythonic Perambulations Categories Atom Feed" />
+
+
+
+
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="/">Pythonic Perambulations <strong>Musings and ramblings through the world of Python and beyond</strong></a></h1>
+        </header><!-- /#banner -->
+        <nav id="menu"><ul>
+            <li><a href="/archives.html">Archives</a></li>
+            <li><a href="http://www.astro.washington.edu/users/vanderplas">Home Page</a></li>
+              <li class="active"><a href="/category/misc.html">misc</a></li>
+        </ul></nav><!-- /#menu -->
+<section id="content" class="body">
+  <header>
+    <h2 class="entry-title">
+      <a href="/blog/2013/05/07/migrating-from-octopress-to-pelican/" rel="bookmark"
+         title="Permalink to Migrating from Octopress to Pelican">Migrating from Octopress to Pelican</a></h2>
+ 
+  </header>
+  <footer class="post-info">
+    <abbr class="published" title="2013-05-07T17:00:00-07:00">
+       5 07, 2013
+    </abbr>
+    <address class="vcard author">
+      By           <a class="url fn" href="/author/jake-vanderplas.html">Jake Vanderplas</a>
+    </address>
+  </footer><!-- /.post-info -->
+  <div class="entry-content">
+    <!-- PELICAN_BEGIN_SUMMARY -->
+
+<p>After nine months on Octopress, I've decided to move on.</p>
+<p>I should start by saying that Octopress is a great platform for static
+blogging: it's powerful, flexible, well-supported, well-integrated with
+GitHub pages, and has tools and plugins to do just about anything you might
+imagine.  There's only one problem:</p>
+<p>It's written in Ruby.</p>
+<p>Now I don't have anything against Ruby per se.  However, it was starting to
+seem a bit awkward that a blog called <em>Pythonic Perambulations</em>
+was built with Ruby, especially given the availability of so many
+excellent Python-based static site generators
+(<a href="http://hyde.github.io/">Hyde</a>,
+<a href="http://nikola.ralsina.com.ar/">Nikola</a>,
+and <a href="http://getpelican.com">Pelican</a> in particular).</p>
+<p>Additionally, a few things with Octopress were starting to become difficult:
+<!-- PELICAN_END_SUMMARY -->
+first, I wanted a way to easily insert IPython notebooks into posts.
+Sure, I developed a <a href="/blog/2012/10/04/blogging-with-ipython/">hackish solution</a>
+to notebooks in Octopress which had worked
+well enough for a while, but a cleaner method would have involved
+digging into the Ruby source code and writing a full-fledged Octopress
+extension, based on nbconvert.  This would have involved a fair bit of effort
+to learn Ruby and figure out how to best interface it with the Python nbconvert
+code. Second, Ruby has so many strange and difficult pieces:
+GemFiles, RVM, rake... and I never took the time to really understand
+the real purpose of all of them (self-reflection:
+what parts of Python would seem strange and difficult if I hadn't
+been using them for so many years?).  The black-box nature of the process,
+at least in my own case, was starting to bother me.</p>
+<p>But the kicker was this: In January I got a new computer, and after a reasonable
+amount of effort was unable to successfully build my blog.  I've been writing
+my posts exclusively on my old laptop which I somehow managed to successfully
+set up last August.  But that laptop now has a sorely outdated Ubuntu distro
+that I couldn't upgrade for fear of losing the ability to update my blog.
+Needless to say, this was not the most effective setup.</p>
+<p>It was time to switch my blog engine to Python.</p>
+<h2>Choosing a Python Static Generator</h2>
+<p>I started asking around, and found that there were three solid contenders for
+a Python-based platform to replace Octopress: <a href="http://hyde.github.io/">Hyde</a>,
+<a href="http://nikola.ralsina.com.ar/">Nikola</a>,
+and <a href="http://getpelican.com">Pelican</a>.  I gave Hyde a test-run a few weeks ago
+in re-making my <a href="http://www.astro.washington.edu/users/vanderplas">website</a>,
+and I really like it: it's clean, straightforward, powerful, and easy to use.
+The documentation is a bit lacking, though, and I think it would take a fair
+bit more effort at this point to build a more complicated site with Hyde.</p>
+<p>Nikola and Pelican both seem to be well-loved by their users, but I had to
+choose one.  I went with Pelican for one simple reason:
+it has more GitHub forks.  I'm sure this is entirely
+unfair to Nikola and all the contributors who have poured
+their energy into the project, but I had to choose one way or another.
+I'm pleased to say that Pelican has not been a disappointment:
+I've found it to be flexible and powerful.  It has an active developer-base,
+and makes available a wide array of themes and plugins.
+For the few extra pieces I needed, I found the plugin and theming
+API to be well-documented and straightforward to use.</p>
+<h2>Migrating to Pelican from Octopress</h2>
+<p>I won't attempt to write a one-size-fits-all guide to migrating to Pelican
+from Octopress: there are too many possibile combinations of formats, plugins,
+themes, etc.  But I will walk through my own process in some detail, in hopes
+that it might help others who find themselves in a similar predicament.</p>
+<p>I had several goals when doing this migration:</p>
+<ul>
+<li>I wanted, as much as possible, to maintain the look and feel of the blog.
+  I like the default Octopress theme: it's simple, clean, compact, and
+  includes all the aspects I need for a good blog.</li>
+<li>I wanted, as much as possible, to leave the source of my posts unmodified:
+  luckily Pelican supports writing posts in markdown and allows easy insertion
+  of custom plugins, so this was relatively easy to accommodate.</li>
+<li>I wanted to maintain the history of Disqus comments for each page, as well
+  as the Twitter and Google Pages tools.</li>
+<li>I wanted, as much as possible, to maintain the same URLs for all content,
+  including posts, notebooks, images, and videos.</li>
+<li>I wanted a clean way to insert html-formatted IPython notebooks into blog
+  posts. Nearly half my posts are written as notebooks, and the
+  <a href="/blog/2012/10/04/blogging-with-ipython/">old way</a> of including them
+  was becoming much too cumbersome.</li>
+</ul>
+<p>I was able to suitably address all these goals with Pelican
+in a few evenings' effort.  Some of it was already
+built-in to the Pelican settings architecture, some required
+customization of themes and extensions, and some required writing some brand
+new plugins.  I'll summarize these aspects below:</p>
+<h3>Blog theme</h3>
+<p>As I mentioned, I wanted to keep the look and feel of the blog consistent.
+Luckily, someone had gone before me and created an
+<a href="https://github.com/duilio/pelican-octopress-theme">octopress Pelican theme</a>
+which did most of the heavy lifting.  I contributed
+a few additional features, including the ability to
+<a href="https://github.com/duilio/pelican-octopress-theme/pull/12">specify Disqus tags</a>
+and maintain comment history, to
+<a href="https://github.com/duilio/pelican-octopress-theme/pull/11">add Twitter, Google Plus, and Facebook</a> links in the sidebar and footer,
+to add a <a href="https://github.com/duilio/pelican-octopress-theme/pull/15">custom site search</a>
+box which appears in the upper right of the
+navigation panel, as well as a few
+<a href="https://github.com/duilio/pelican-octopress-theme/pull/14">other</a>
+<a href="https://github.com/duilio/pelican-octopress-theme/pull/13">tweaks</a>.
+The result is what you see here: nearly identical to the old layout, with
+all the bells and whistles included.</p>
+<h3>Octopress Markdown to Pelican Markdown</h3>
+<p>Octopress has a few plugins which add some syntactic sugar to the markdown
+language.  These are tags specified in
+<a href="https://github.com/Shopify/liquid">Liquid</a>-style syntax:</p>
+<div class="highlight"><pre><span class="p">{</span><span class="o">%</span> <span class="n">literal</span> <span class="n">tag</span> <span class="n">arg1</span> <span class="n">arg2</span> <span class="p">...</span> <span class="o">%</span><span class="p">}</span>
+</pre></div>
+
+
+<p>I have made extensive use of these in my octopress posts, primarily to insert
+videos, images, and code blocks from file.
+In order to accommodate this in Pelican, I wrote
+a <a href="https://github.com/getpelican/pelican-plugins/pull/21">Pelican plugin</a>
+which wraps a custom Markdown preprocessor written via the
+<a href="http://pythonhosted.org/Markdown/extensions/api.html">Markdown extension API</a>
+which can correctly interpret these types of tags.  The tags ported from
+octopress thus far are:</p>
+<h4>The Image Tag</h4>
+<p>The image tag allows insertion of an image into the post with a
+specified size and position:</p>
+<div class="highlight"><pre><span class="p">{</span><span class="o">%</span> <span class="n">literal</span> <span class="n">img</span> <span class="p">[</span><span class="n">position</span><span class="p">]</span> <span class="o">/</span><span class="n">url</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="n">img</span><span class="p">.</span><span class="n">png</span> <span class="p">[</span><span class="n">width</span><span class="p">]</span> <span class="p">[</span><span class="n">height</span><span class="p">]</span> <span class="p">[</span><span class="n">title</span><span class="p">]</span> <span class="p">[</span><span class="n">alt</span><span class="p">]</span> <span class="o">%</span><span class="p">}</span>
+</pre></div>
+
+
+<p>Here is an example of the result of the image tag:</p>
+<p>{% img /images/galaxy.jpg 300 200 A Galaxy %}</p>
+<h4>The Video Tag</h4>
+<p>The video tag allows embedding of an HTML5/Flash-compatible video
+into the post:</p>
+<div class="highlight"><pre><span class="p">{</span><span class="o">%</span> <span class="n">literal</span> <span class="n">video</span> <span class="o">/</span><span class="n">url</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="n">video</span><span class="p">.</span><span class="n">mp4</span> <span class="p">[</span><span class="n">width</span><span class="p">]</span> <span class="p">[</span><span class="n">height</span><span class="p">]</span> <span class="p">[</span><span class="o">/</span><span class="n">url</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="n">poster</span><span class="p">.</span><span class="n">png</span><span class="p">]</span> <span class="o">%</span><span class="p">}</span>
+</pre></div>
+
+
+<p>Here is an example of the output of the video tag:</p>
+<p>{% video /downloads/videos/animate_square.mp4 240 180 /downloads/videos/animate_square.png %}</p>
+<p>(see <a href="/blog/2012/09/26/optical-illusions-in-matplotlib/">this post</a> for a
+description of this video).</p>
+<h4>The Code Include Tag</h4>
+<p>The <code>include_code</code> tag allows the insertion of formatted lines from
+a file into the post, with a title and a link to the source file:</p>
+<div class="highlight"><pre><span class="p">{</span><span class="o">%</span> <span class="n">literal</span> <span class="n">include_code</span> <span class="n">filename</span><span class="p">.</span><span class="n">py</span> <span class="p">[</span><span class="n">lang</span><span class="o">:</span><span class="n">python</span><span class="p">]</span> <span class="p">[</span><span class="n">title</span><span class="p">]</span> <span class="o">%</span><span class="p">}</span>
+</pre></div>
+
+
+<p>Here is an example of the output of the code include tag:</p>
+<p>{% include_code hello_world.py lang:python Hello World %}</p>
+<p>For more information on using these tags, refer to the
+<a href="https://github.com/getpelican/pelican-plugins/pull/21">module doc-strings</a>.</p>
+<h3>Maintaining Disqus Comment Threads</h3>
+<p>Static blogs are fast, lightweight, and easy to deploy.  A disadvantage, though,
+is the inability to natively include dynamic elements such as comment threads.
+<a href="http://disqus.com/">Disqus</a>
+is a third-party service that skirts this disadvantage very
+seamlessly.  All it takes is to add a small javascript snippet with some
+identifiers in the appropriate place on your page, and Disqus takes care of
+the rest.  To keep the comment history on each page required assuring that
+the site identifier and page identifiers remained the same between blog
+versions.  This part happens within the theme, and my
+<a href="https://github.com/duilio/pelican-octopress-theme/pull/12">Disqus PR</a>
+to the Pelican Octopress theme made this work correctly.</p>
+<h3>Maintaining the URL structure</h3>
+<p>By default, Octopress stores posts with a structure looking like
+<code>blog/YYYY/MM/DD/article-slug/</code>.  The Pelican default is different, but
+easy enough to change.  In the <code>pelicanconf.py</code>
+settings file, this corresponds to the following:</p>
+<div class="highlight"><pre><span class="n">ARTICLE_URL</span> <span class="o">=</span> <span class="err">&#39;</span><span class="n">blog</span><span class="o">/</span><span class="p">{</span><span class="n">date</span><span class="o">:%</span><span class="n">Y</span><span class="p">}</span><span class="o">/</span><span class="p">{</span><span class="n">date</span><span class="o">:%</span><span class="n">m</span><span class="p">}</span><span class="o">/</span><span class="p">{</span><span class="n">date</span><span class="o">:%</span><span class="n">d</span><span class="p">}</span><span class="o">/</span><span class="p">{</span><span class="n">slug</span><span class="p">}</span><span class="o">/</span><span class="err">&#39;</span>
+<span class="n">ARTICLE_SAVE_AS</span> <span class="o">=</span> <span class="err">&#39;</span><span class="n">blog</span><span class="o">/</span><span class="p">{</span><span class="n">date</span><span class="o">:%</span><span class="n">Y</span><span class="p">}</span><span class="o">/</span><span class="p">{</span><span class="n">date</span><span class="o">:%</span><span class="n">m</span><span class="p">}</span><span class="o">/</span><span class="p">{</span><span class="n">date</span><span class="o">:%</span><span class="n">d</span><span class="p">}</span><span class="o">/</span><span class="p">{</span><span class="n">slug</span><span class="p">}</span><span class="o">/</span><span class="n">index</span><span class="p">.</span><span class="n">html</span><span class="err">&#39;</span>
+</pre></div>
+
+
+<p>Next, at the top of the markdown file for each article, the metadata needs
+to be slightly modified from the form used by Octopress -- here is the
+actual metadata used in the document that generates this page:</p>
+<div class="highlight"><pre><span class="n">Title</span><span class="o">:</span> <span class="n">Migrating</span> <span class="n">from</span> <span class="n">Octopress</span> <span class="n">to</span> <span class="n">Pelican</span>
+<span class="n">date</span><span class="o">:</span> <span class="mi">2013</span><span class="o">-</span><span class="mi">05</span><span class="o">-</span><span class="mi">07</span> <span class="mi">17</span><span class="o">:</span><span class="mi">00</span>
+<span class="n">slug</span><span class="o">:</span> <span class="n">migrating</span><span class="o">-</span><span class="n">from</span><span class="o">-</span><span class="n">octopress</span><span class="o">-</span><span class="n">to</span><span class="o">-</span><span class="n">pelican</span>
+</pre></div>
+
+
+<p>Additionally, the static elements of the blog (images, videos, IPython
+notebooks, code snippets, etc.) must be put within the correct directory
+structure.  These static files should be put in paths which are specified
+via the <code>STATIC_PATHS</code> setting:</p>
+<div class="highlight"><pre><span class="n">STATIC_PATHS</span> <span class="o">=</span> <span class="p">[</span><span class="err">&#39;</span><span class="n">images</span><span class="err">&#39;</span><span class="p">,</span> <span class="err">&#39;</span><span class="n">figures</span><span class="err">&#39;</span><span class="p">,</span> <span class="err">&#39;</span><span class="n">downloads</span><span class="err">&#39;</span><span class="p">]</span>
+</pre></div>
+
+
+<p>Pelican presented a challenge here: as of the time of this
+writing, Pelican has a hard-coded <code>'static'</code> subdirectory where these
+static paths are saved.  I submitted a
+<a href="https://github.com/getpelican/pelican/pull/875">pull request</a> to Pelican
+that replaces this hard-coded setting with a configurable path: because
+the change conflicts with a
+<a href="https://github.com/getpelican/pelican/pull/795">bigger refactoring</a>
+of the code which is ongoing, the PR will not be merged.  But until this
+new refactoring is finished, I'll be using
+<a href="https://github.com/jakevdp/pelican/tree/specify-static">my own branch</a>
+of Pelican to make this blog, and specify the correct static paths.</p>
+<h3>Inserting Notebooks</h3>
+<p>The ability to seamlessly insert IPython notebooks into posts was one of the
+biggest drivers of my switch to Pelican.  Pelican has an
+<a href="http://danielfrg.github.io/blog/2013/03/08/pelican-ipython-notebook-plugin/">ipython notebook plugin</a>
+available, but I wasn't completely happy with it.  The plugin implements
+a reader which treats the notebooks themselves as the source of a post,
+leading to the requirement to insert blog metadata into the notebook itself.
+This is a suitable solution, but for my own purposes I much prefer a solution
+in which the content of a notebook could be inserted into a stand-alone post,
+such that the notebook and the blog metadata are completely separate.</p>
+<p>To accomplish this, I added a submodule to my
+<a href="https://github.com/jakevdp/pelican-plugins/blob/liquid_tags/liquid_tags/notebook.py">liquid_tags</a> Pelican plugin which allows the insertion of notebooks
+using the following syntax:</p>
+<div class="highlight"><pre><span class="p">{</span><span class="o">%</span> <span class="n">literal</span> <span class="n">notebook</span> <span class="n">path</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="n">notebook</span><span class="p">.</span><span class="n">ipynb</span> <span class="p">[</span><span class="n">cells</span><span class="p">[</span><span class="n">i</span><span class="o">:</span><span class="n">j</span><span class="p">]]</span> <span class="o">%</span><span class="p">}</span>
+</pre></div>
+
+
+<p>This inserts the notebook at the given location in the post, optionally
+selecting a given range of notebook cells with standard Python list slicing
+syntax.</p>
+<p>The formatting of notebooks requires some special CSS styles which must
+be inserted into the header of each page where notebooks are shown.  Rather
+than requiring the theme to be customized to support notebooks, I decided
+on a solution where an <code>EXTRA_HEADER</code> setting is used to specify html
+and CSS which
+should be added to the header of the main page.  The notebook plugin
+saves the required header to a file called <code>_nb_header.html</code> within
+the main source directory.  To
+insert the appropriate formatting, we add the following lines to the
+settings file, <code>pelicanconf.py</code>:</p>
+<div class="highlight"><pre><span class="n">EXTRA_HEADER</span> <span class="o">=</span> <span class="n">open</span><span class="p">(</span><span class="err">&#39;</span><span class="n">_nb_header</span><span class="p">.</span><span class="n">html</span><span class="err">&#39;</span><span class="p">).</span><span class="n">read</span><span class="p">().</span><span class="n">decode</span><span class="p">(</span><span class="err">&#39;</span><span class="n">utf</span><span class="o">-</span><span class="mi">8</span><span class="err">&#39;</span><span class="p">)</span>
+</pre></div>
+
+
+<p>In the theme file, within the header tag, we add the following:</p>
+<div class="highlight"><pre><span class="x"> </span><span class="cp">{%</span> <span class="k">if</span> <span class="nv">EXTRA_HEADER</span> <span class="cp">%}</span><span class="x"></span>
+<span class="x"> </span><span class="cp">{{</span> <span class="nv">EXTRA_HEADER</span> <span class="cp">}}</span><span class="x"></span>
+<span class="x"> </span><span class="cp">{%</span> <span class="k">endif</span> <span class="cp">%}</span><span class="x"></span>
+</pre></div>
+
+
+<p>Here is the result: a short notebook inserted directly into the post:</p>
+<p>{% notebook TestNotebook.ipynb %}</p>
+<h2></h2>
+<p>With all those things in place, the blog was ready to be built.  The result
+is right in front of you: you're reading it.  If you'd like to see the source
+from which this blog built, it's available at
+<a href="http://www.github.com/jakevdp/PythonicPerambulations">http://www.github.com/jakevdp/PythonicPerambulations</a>.  Feel free to adapt the configurations and theme
+to suit your own needs.</p>
+<p>I'm glad to be working purely in Python from now on!</p>
+  </div><!-- /.entry-content -->
+</section>
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>,
+                which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+        </footer><!-- /#contentinfo -->
+</body>
+</html>
